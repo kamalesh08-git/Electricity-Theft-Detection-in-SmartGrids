@@ -9,7 +9,7 @@ Load raw smart-meter consumption data and clean it:
 
 import numpy as np
 import pandas as pd
-
+from sklearn.model_selection import train_test_split
 
 META_COLS = ["FLAG", "THEFT_PATTERN"]
 
@@ -54,3 +54,22 @@ if __name__ == "__main__":
     print("Consumers:", series.shape[0], "Days:", series.shape[1])
     print("Missing after cleaning:", series.isna().sum().sum())
     print(meta["FLAG"].value_counts())
+
+def load_preprocessed_data(parquet_path="data/sgcc_features.parquet", test_size=0.2, random_state=42):
+    """
+    Loads precomputed features from snappy-compressed Parquet.
+    Avoids loading hundreds of daily time-series columns locally.
+    """
+    df = pd.read_parquet(parquet_path)
+    
+    feature_cols = [c for c in df.columns if c not in ["CONS_NO", "FLAG"]]
+    X = df[feature_cols]
+    y = df["FLAG"]
+    cons_nos = df["CONS_NO"]
+
+    # Stratify to preserve the exact theft/normal ratio in test split
+    X_train, X_test, y_train, y_test, ids_train, ids_test = train_test_split(
+        X, y, cons_nos, test_size=test_size, stratify=y, random_state=random_state
+    )
+
+    return X_train, X_test, y_train, y_test, ids_test
